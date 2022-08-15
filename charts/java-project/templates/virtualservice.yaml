@@ -1,0 +1,31 @@
+{{- if .Values.virtualservice.enabled -}}
+{{- $fullName := include "java-project.fullname" . -}}
+{{- $svcPort := .Values.service.port -}}
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: {{ $fullName }}
+  labels:
+    {{- include "java-project.labels" . | nindent 4 }}
+spec:
+  hosts:
+    {{- toYaml .Values.virtualservice.hosts | nindent 4 }}
+  http:
+    {{- toYaml .Values.virtualservice.routes | nindent 4 }}
+  gateways:
+    {{- toYaml .Values.virtualservice.gateways | nindent 4 }}
+
+{{- if .Values.destinationrule.enabled -}}
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: {{ $fullName }}-destination-rule
+  labels:
+    {{- include "java-project.labels" . | nindent 4 }}
+spec:
+  host: {{ $fullName }}.{{ .Release.Namespace }}.svc.cluster.local # interpreted as reviews.foo.svc.cluster.local
+  subsets:
+    {{- toYaml .Values.destinationrule.subsets | nindent 4 }}
+{{- end }}
+{{- end }}

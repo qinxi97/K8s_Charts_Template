@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "java-project.fullname" . }}
+  labels:
+    {{- include "java-project.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "java-project.selectorLabels" . | nindent 6 }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        {{- include "java-project.selectorLabels" . | nindent 8 }}
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      serviceAccountName: {{ include "java-project.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Release.Name }}
+          securityContext:
+            runAsUser: 0
+          env:
+            - name: MAX_MEMORY
+              value: {{ trimSuffix "i" .Values.resources.limits.memory | lower }}
+            - name: MIN_MEMORY
+              value: {{ trimSuffix "i" .Values.resources.requests.memory | lower }}
+            {{- if .Values.envVars -}}
+            {{- range $key, $val := .Values.envVars }}
+            - name: {{ $key }}
+              value: {{ $val }}
+            {{- end -}}
+            {{- end -}}
+            {{- if .Values.logCollector.enabled -}}
+            {{- if .Values.logCollector.logfile }}
+            - name: aliyun_logs_{{ .Release.Name }}
+              value: {{ .Values.logCollector.logfile | quote }}
+            {{- end }}
+            - name: aliyun_logs_{{ .Release.Name }}-stdout
+              value: stdout
+            {{- end }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.listenPort | default 80 }}
+              protocol: TCP
+            {{- if .Values.withHealthyService }}
+            - name: health
+              containerPort: 9999
+              protocol: TCP
+            {{- end }}
+          livenessProbe:
+            {{- if eq .Values.healthCheck.liveness.method "httpGet" }}
+            httpGet:
+              {{- if .Values.healthCheck.common }}
+              path: {{ .Values.healthCheck.readiness.path | default "/monitor/health" }}
+              port: health
+              {{- else }}
+              path: {{ .Values.healthCheck.liveness.path | default "/" }}
+              port: http
+              {{- end }}
+            {{- end }}
+            failureThreshold: 10
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 3
+          readinessProbe:
+            {{- if eq .Values.healthCheck.readiness.method "httpGet" }}
+            httpGet:
+              {{- if .Values.healthCheck.common }}
+              path: {{ .Values.healthCheck.readiness.path | default "/monitor/health" }}
+              port: health
+              {{- else }}
+              path: {{ .Values.healthCheck.readiness.path | default "/" }}
+              port: http
+              {{- end }}
+            {{- end }}
+            failureThreshold: 10
+            initialDelaySeconds: 36
+            periodSeconds: 10
+            successThreshold: 2
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: volumn-sls-dir
+              mountPath: /app/logs
+      volumes:
+        - name: volumn-sls-dir
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}

@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "vue-statics.fullname" . }}
+  labels:
+    {{- include "vue-statics.labels" . | nindent 4 }}
+  annotations:
+    {{- if eq .Values.service.type "LoadBalancer" }}
+    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: {{ .Values.service.lbAddressType | default "intranet"}}
+    service.beta.kubernetes.io/alibaba-cloud-loadbalancer-remove-unscheduled-backend: on
+    {{- else }}
+    {}
+    {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+#  externalTrafficPolicy: Local
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "vue-statics.selectorLabels" . | nindent 4 }}
