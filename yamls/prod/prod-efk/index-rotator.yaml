@@ -1,0 +1,23 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: es-index-rotator
+  namespace: logging
+spec:
+  schedule: "3 1 */1 * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: es-index-rotator
+            image: registry-intl.us-east-1.aliyuncs.com/roxe-public/es-index-rotator:0.2.4
+          
+            command:
+            - /bin/rotate.sh
+            - "20"
+            - "k8s"
+          restartPolicy: OnFailure
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 1
