@@ -1,2 +1,3 @@
-# roxe-charts
-k8s deploy charts
+# Roxe Charts
+
+Kubernetes 部署配置模板
